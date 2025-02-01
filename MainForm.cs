@@ -21,7 +21,9 @@ namespace SistemaAuditoria
             this.StartPosition = FormStartPosition.CenterScreen;
 
             gridAnomaliasSinDatos.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            gridAnomaliasConDatos.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             gridAnomaliasSinDatos.ColumnHeadersDefaultCellStyle.BackColor = Color.LightGray;
+            gridAnomaliasConDatos.ColumnHeadersDefaultCellStyle.BackColor = Color.LightGray;
             gridAnomaliasSinDatos.RowPrePaint += (sender, e) =>
             {
                 var grid = sender as DataGridView;
@@ -36,6 +38,22 @@ namespace SistemaAuditoria
                     _ => Color.White
                 };
             };
+
+            gridAnomaliasConDatos.RowPrePaint += (sender, e) =>
+            {
+                var grid = sender as DataGridView;
+                if (grid.Rows[e.RowIndex].Cells["Criticidad"].Value == null) return;
+
+                var criticidad = grid.Rows[e.RowIndex].Cells["Criticidad"].Value.ToString();
+                grid.Rows[e.RowIndex].DefaultCellStyle.BackColor = criticidad switch
+                {
+                    "Crítica" => Color.LightCoral,
+                    "Alta" => Color.LightSalmon,
+                    "Media" => Color.LightGoldenrodYellow,
+                    _ => Color.White
+                };
+            };
+        
 
         }
 
@@ -76,11 +94,24 @@ namespace SistemaAuditoria
             int activeTabIndex = tabControl1.SelectedIndex;
             switch (activeTabIndex)
             {
+                case 0:
+                    var anomaliasConDatosChecker = new AnomaliasConDatosChecker(_con);
+                    DataTable anomaliasConDatosData = anomaliasConDatosChecker.ObtenerAnomaliasConDatos();
+
+                    if (anomaliasConDatosData.Rows.Count == 0)
+                    {
+                        MessageBox.Show("No se encontraron anomalías con datos.", "Información", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+
+                    gridAnomaliasConDatos.DataSource = anomaliasConDatosData;
+                    gridAnomaliasConDatos.Refresh();
+                    break;
                 case 1:
                     var anomaliasChecker = new AnomaliasSinDatosChecker(_con);
                     DataTable anomaliasData = anomaliasChecker.ObtenerAnomaliasSinDatos();
                     gridAnomaliasSinDatos.DataSource = anomaliasData;
                     break;
+
                 case 3:
                     // Crear instancia de la clase TriggerChecker
                     TriggerChecker triggerChecker = new TriggerChecker(_con);
@@ -103,6 +134,11 @@ namespace SistemaAuditoria
             var anomaliasChecker = new AnomaliasSinDatosChecker(_con);
             DataTable anomaliasData = anomaliasChecker.ObtenerAnomaliasSinDatos();
             gridAnomaliasSinDatos.DataSource = anomaliasData;
+
+            // Auditoría de anomalías con datos
+            var anomaliasConDatosChecker = new AnomaliasConDatosChecker(_con);
+            DataTable anomaliasConDatosData = anomaliasConDatosChecker.ObtenerAnomaliasConDatos();
+            gridAnomaliasConDatos.DataSource = anomaliasConDatosData;
 
             // Crear instancia de la clase TriggerChecker
             TriggerChecker triggerChecker = new TriggerChecker(_con);
