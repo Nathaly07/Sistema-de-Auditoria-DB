@@ -18,7 +18,7 @@ namespace SistemaAuditoria.Clases
             DataTable dt = new DataTable();
             string query = @"
             SELECT * FROM (
-                -- Registros Huérfanos (Claves foráneas sin referencia válida en la tabla padre)
+            -- Registros Huérfanos (Claves foráneas sin referencia válida en la tabla padre)
                 SELECT 
                     'Registros Huérfanos' AS TipoAnomalia,
                     OBJECT_NAME(fk.parent_object_id) AS TablaOrigen,
@@ -33,7 +33,7 @@ namespace SistemaAuditoria.Clases
 
                 UNION ALL
 
-                -- Duplicidad de Datos (Ahora detecta registros duplicados correctamente)
+                -- Duplicidad de Datos (Ahora detecta registros duplicados correctamente en cualquier tabla)
                 SELECT 
                     'Duplicidad de Datos' AS TipoAnomalia,
                     t.name AS TablaOrigen,
@@ -64,9 +64,9 @@ namespace SistemaAuditoria.Clases
                 JOIN INFORMATION_SCHEMA.COLUMNS ic ON ic.TABLE_NAME = t.name
                 WHERE ic.DATA_TYPE IN ('date', 'datetime', 'datetime2') 
                 AND EXISTS (
-                    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
-                    WHERE TABLE_NAME = ic.TABLE_NAME
-                    AND COLUMN_NAME LIKE '%date%'
+                    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS ic2
+                    WHERE ic2.TABLE_NAME = ic.TABLE_NAME
+                    AND ic2.COLUMN_NAME LIKE '%date%'
                     AND (
                         TRY_CAST(GETDATE() AS DATE) < '2000-01-01'
                         OR TRY_CAST(GETDATE() AS DATE) > GETDATE()
@@ -75,16 +75,25 @@ namespace SistemaAuditoria.Clases
 
                 UNION ALL
 
-                -- Claves Compuestas Duplicadas
+                -- Claves Compuestas Duplicadas en cualquier tabla con claves compuestas
                 SELECT 
                     'Duplicidad en Claves Compuestas' AS TipoAnomalia,
-                    'TBL_USER_SONG' AS TablaOrigen,
+                    t.name AS TablaOrigen,
                     '' AS TablaDestino,
-                    'Existen combinaciones duplicadas en la tabla TBL_USER_SONG' AS Descripcion,
+                    'Existen combinaciones duplicadas en la tabla ' + t.name AS Descripcion,
                     'Alta' AS Criticidad
-                FROM TBL_USER_SONG
-                GROUP BY ID_USER, ID_SONG
-                HAVING COUNT(*) > 1
+                FROM sys.tables t
+                WHERE EXISTS (
+                    SELECT 1 FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
+                    JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu ON tc.TABLE_NAME = kcu.TABLE_NAME
+                    WHERE tc.CONSTRAINT_TYPE = 'PRIMARY KEY'
+                    AND EXISTS (
+                        SELECT 1 FROM sys.tables realTable
+                        WHERE realTable.name = t.name
+                        GROUP BY realTable.object_id
+                        HAVING COUNT(*) > 1
+                    )
+                )
             ) AS Resultados
             ORDER BY 
                 CASE Criticidad
@@ -93,7 +102,8 @@ namespace SistemaAuditoria.Clases
                     WHEN 'Media' THEN 3
                     ELSE 4
                 END, 
-                TablaOrigen;";
+                TablaOrigen;
+";
 
             try
             {
