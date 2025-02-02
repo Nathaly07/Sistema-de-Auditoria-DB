@@ -14,7 +14,10 @@ namespace SistemaAuditoria.Clases
 
         public DatabaseConnection(string server, string database, string user, string password)
         {
-            if (string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(database) || string.IsNullOrWhiteSpace(user) || string.IsNullOrWhiteSpace(password))
+            if (string.IsNullOrWhiteSpace(server) || 
+                string.IsNullOrWhiteSpace(database) || 
+                string.IsNullOrWhiteSpace(user) || 
+                string.IsNullOrWhiteSpace(password))
             {
                 throw new ArgumentException("Todos los parámetros de la conexión son obligatorios.");
             }

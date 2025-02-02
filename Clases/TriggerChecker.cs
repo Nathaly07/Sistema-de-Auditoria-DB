@@ -10,7 +10,6 @@ namespace SistemaAuditoria.Clases
 
         public TriggerChecker(DatabaseConnection dbConnection)
         {
-            Console.WriteLine(dbConnection);
             _dbConnection = dbConnection;
         }
 
@@ -44,14 +43,19 @@ namespace SistemaAuditoria.Clases
                         dt.Load(reader);
                     }
                 }
-               ;
+
+                // Loguear cada trigger obtenido
+                foreach (DataRow row in dt.Rows)
+                {
+                    string msg = $"Trigger: {row["NombreTrigger"]} en tabla {row["TablaAsociada"]} ({row["TipoTrigger"]}) - Evento: {row["Evento"]}";
+                    AuditLogger.Log("Triggers", msg, "Info");
+                }
             }
             catch (Exception ex)
             {
-                // Puedes loggear el error o lanzar una excepción personalizada
+                AuditLogger.Log("Triggers", "Error al obtener triggers: " + ex.Message, "Crítica");
                 throw new InvalidOperationException("Error al ejecutar la consulta para obtener triggers y constraints.", ex);
             }
-
             return dt;
         }
     }

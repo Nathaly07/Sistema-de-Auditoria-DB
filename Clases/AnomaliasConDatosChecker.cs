@@ -114,9 +114,14 @@ namespace SistemaAuditoria.Clases
                         dt.Load(reader);
                     }
                 }
+                foreach (DataRow row in dt.Rows)
+                {
+                    AuditLogger.Log("AnomaliasConDatos", row["Descripcion"].ToString(), row["Criticidad"].ToString());
+                }
             }
             catch (Exception ex)
             {
+                AuditLogger.Log("AnomaliasConDatos", "Error al obtener anomalías con datos: " + ex.Message, "Crítica");
                 throw new InvalidOperationException("Error al obtener anomalías con datos", ex);
             }
 

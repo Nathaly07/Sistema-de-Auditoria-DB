@@ -1,10 +1,6 @@
 ﻿using Microsoft.Data.SqlClient;
 using System;
-using System.Collections.Generic;
 using System.Data;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SistemaAuditoria.Clases
 {
@@ -14,7 +10,6 @@ namespace SistemaAuditoria.Clases
 
         public ConstrainsChecker(DatabaseConnection dbConnection)
         {
-            Console.WriteLine(dbConnection);
             _dbConnection = dbConnection;
         }
 
@@ -60,14 +55,19 @@ WHERE tc.TABLE_CATALOG = DB_NAME();";
                         dt.Load(reader);
                     }
                 }
-               ;
+
+                // Loguear cada restricción obtenida
+                foreach (DataRow row in dt.Rows)
+                {
+                    string msg = $"Restricción: {row["Nombre_Restriccion"]} en tabla {row["Tabla"]} (Tipo: {row["Tipo_Restriccion"]})";
+                    AuditLogger.Log("Constraints", msg, "Info");
+                }
             }
             catch (Exception ex)
             {
-                // Puedes loggear el error o lanzar una excepción personalizada
-                throw new InvalidOperationException("Error al ejecutar la consulta para obtener triggers y constraints.", ex);
+                AuditLogger.Log("Constraints", "Error al obtener constraints: " + ex.Message, "Crítica");
+                throw new InvalidOperationException("Error al ejecutar la consulta para obtener constraints.", ex);
             }
-
             return dt;
         }
     }
