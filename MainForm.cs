@@ -111,6 +111,12 @@ namespace SistemaAuditoria
                     DataTable anomaliasData = anomaliasChecker.ObtenerAnomaliasSinDatos();
                     gridAnomaliasSinDatos.DataSource = anomaliasData;
                     break;
+                case 2:
+                    var constrains = new ConstrainsChecker(_con);
+                    DataTable anomaliasC = constrains.ObtenerConstraints();
+
+                    gridConstrains.DataSource = anomaliasC;
+                    break;
 
                 case 3:
                     // Crear instancia de la clase TriggerChecker
@@ -140,6 +146,10 @@ namespace SistemaAuditoria
             DataTable anomaliasConDatosData = anomaliasConDatosChecker.ObtenerAnomaliasConDatos();
             gridAnomaliasConDatos.DataSource = anomaliasConDatosData;
 
+            var constrains = new ConstrainsChecker(_con);
+            DataTable anomaliasC = constrains.ObtenerConstraints();
+
+            gridConstrains.DataSource = anomaliasC;
             // Crear instancia de la clase TriggerChecker
             TriggerChecker triggerChecker = new TriggerChecker(_con);
 
