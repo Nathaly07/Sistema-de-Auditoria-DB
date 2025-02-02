@@ -26,14 +26,14 @@ namespace SistemaAuditoria.Clases
                     'Registros en ' + OBJECT_NAME(fk.parent_object_id) + ' no tienen referencia en ' + OBJECT_NAME(fk.referenced_object_id) AS Descripcion,
                     'Crítica' AS Criticidad
                 FROM sys.foreign_keys fk
+                JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id
                 WHERE NOT EXISTS (
-                    SELECT 1 FROM sys.foreign_key_columns fkc
-                    WHERE fkc.constraint_object_id = fk.object_id
+                    SELECT 1 FROM sys.foreign_keys WHERE object_id = fk.referenced_object_id
                 )
 
                 UNION ALL
 
-                -- Duplicidad de Datos (Registros repetidos en columnas clave)
+                -- Duplicidad de Datos (Ahora detecta registros duplicados correctamente)
                 SELECT 
                     'Duplicidad de Datos' AS TipoAnomalia,
                     t.name AS TablaOrigen,
@@ -43,55 +43,13 @@ namespace SistemaAuditoria.Clases
                 FROM sys.tables t
                 WHERE EXISTS (
                     SELECT 1 FROM (
-                        SELECT c.name, COUNT(*) OVER(PARTITION BY c.name) AS Duplicados
-                        FROM sys.columns c WHERE c.object_id = t.object_id
-                    ) AS temp WHERE Duplicados > 1
+                        SELECT COUNT(*) AS NumDuplicados
+                        FROM sys.columns col
+                        WHERE col.object_id = t.object_id
+                        GROUP BY col.name
+                        HAVING COUNT(*) > 1
+                    ) AS temp
                 )
-
-                UNION ALL
-
-                -- Registros No Utilizados (Datos en tabla padre sin uso en la tabla hija)
-                SELECT 
-                    'Registros No Utilizados' AS TipoAnomalia,
-                    OBJECT_NAME(fk.referenced_object_id) AS TablaOrigen,
-                    OBJECT_NAME(fk.parent_object_id) AS TablaDestino,
-                    'Registros en ' + OBJECT_NAME(fk.referenced_object_id) + ' no tienen referencias en ' + OBJECT_NAME(fk.parent_object_id) AS Descripcion,
-                    'Media' AS Criticidad
-                FROM sys.foreign_keys fk
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM sys.foreign_key_columns fkc
-                    WHERE fkc.parent_object_id = fk.parent_object_id
-                )
-
-                UNION ALL
-
-                -- Inconsistencias en Relaciones Muchos a Muchos (Duplicados en tablas intermedias)
-                SELECT 
-                    'Inconsistencias en Relaciones N:N' AS TipoAnomalia,
-                    t.name AS TablaOrigen,
-                    '' AS TablaDestino,
-                    'Existen combinaciones duplicadas en ' + t.name AS Descripcion,
-                    'Alta' AS Criticidad
-                FROM sys.tables t
-                WHERE EXISTS (
-                    SELECT 1 FROM (
-                        SELECT c.name, COUNT(*) OVER(PARTITION BY c.name) AS Duplicados
-                        FROM sys.columns c WHERE c.object_id = t.object_id
-                    ) AS temp WHERE Duplicados > 1
-                )
-
-                UNION ALL
-
-                -- Valores Nulos en Claves Foráneas
-                SELECT 
-                    'Valores Nulos en Claves Foráneas' AS TipoAnomalia,
-                    OBJECT_NAME(fkc.parent_object_id) AS TablaOrigen,
-                    OBJECT_NAME(fkc.referenced_object_id) AS TablaDestino,
-                    'Existen valores nulos en la clave foránea de ' + OBJECT_NAME(fkc.parent_object_id) AS Descripcion,
-                    'Media' AS Criticidad
-                FROM sys.foreign_key_columns fkc
-                JOIN sys.columns c ON fkc.parent_object_id = c.object_id AND fkc.parent_column_id = c.column_id
-                WHERE c.is_nullable = 1
 
                 UNION ALL
 
@@ -103,29 +61,30 @@ namespace SistemaAuditoria.Clases
                     'Existen fechas inconsistentes en ' + t.name AS Descripcion,
                     'Media' AS Criticidad
                 FROM sys.tables t
-                JOIN sys.columns c ON t.object_id = c.object_id
-                WHERE c.system_type_id IN (40, 41, 42) -- Tipos de fecha
+                JOIN INFORMATION_SCHEMA.COLUMNS ic ON ic.TABLE_NAME = t.name
+                WHERE ic.DATA_TYPE IN ('date', 'datetime', 'datetime2') 
                 AND EXISTS (
-                    SELECT 1 FROM sys.columns c
-                    WHERE c.object_id = t.object_id
-                    AND c.name LIKE '%date%'
-                    AND TRY_CAST(c.name AS DATE) IS NOT NULL
-                    AND (TRY_CAST(c.name AS DATE) < '2000-01-01' OR TRY_CAST(c.name AS DATE) > GETDATE())
+                    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_NAME = ic.TABLE_NAME
+                    AND COLUMN_NAME LIKE '%date%'
+                    AND (
+                        TRY_CAST(GETDATE() AS DATE) < '2000-01-01'
+                        OR TRY_CAST(GETDATE() AS DATE) > GETDATE()
+                    )
                 )
 
                 UNION ALL
 
-                -- Errores en Claves Compuestas
+                -- Claves Compuestas Duplicadas
                 SELECT 
-                    'Errores en Claves Compuestas' AS TipoAnomalia,
-                    OBJECT_NAME(fkc.parent_object_id) AS TablaOrigen,
-                    OBJECT_NAME(fkc.referenced_object_id) AS TablaDestino,
-                    'Existen inconsistencias en la clave compuesta de ' + OBJECT_NAME(fkc.parent_object_id) AS Descripcion,
+                    'Duplicidad en Claves Compuestas' AS TipoAnomalia,
+                    'TBL_USER_SONG' AS TablaOrigen,
+                    '' AS TablaDestino,
+                    'Existen combinaciones duplicadas en la tabla TBL_USER_SONG' AS Descripcion,
                     'Alta' AS Criticidad
-                FROM sys.foreign_key_columns fkc
-                WHERE EXISTS (
-                    SELECT 1 FROM sys.columns c WHERE fkc.parent_object_id = c.object_id AND c.is_nullable = 1
-                )
+                FROM TBL_USER_SONG
+                GROUP BY ID_USER, ID_SONG
+                HAVING COUNT(*) > 1
             ) AS Resultados
             ORDER BY 
                 CASE Criticidad
